@@ -3,6 +3,10 @@
 #include <stdio.h>
 #include "mmy.h"
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
 int WINDOW_WIDTH = 1280;
 int WINDOW_HEIGHT = 720;
 
@@ -47,6 +51,12 @@ sprite_sheet loadSpriteSheet(const char* pathToImg, int numFrames, int width, in
     result.h = height;
 
     SDL_Surface* temp = IMG_Load(pathToImg);
+    if (!temp) {
+        printf("Error loading image %s\n", IMG_GetError());
+        result.texture = NULL;
+        return result;
+    }
+
     result.texture = SDL_CreateTextureFromSurface(renderer, temp);
 
     return result;
@@ -75,78 +85,104 @@ void drawSpriteClip(sprite_sheet* sp, int posX, int posY, int alpha)
         sp->currentFrame = 0;
 }
 
-int main(int argc, char* argv[])
+enum gm
 {
+    ICANTMEDITATE,
+    IMUSTSTOP,
+    ALMONDMILK,
+    IMSOSPIRITUAL,
+    IMBORED,
+    MYSTICALEXPERIENCE,
+    UNPLEASANTMEMORY,
+    SEXUALIMAGERY,
+    THISISWEIRD,
+    LAUGHTERTHOUGHT,
+    LEFTFOOT,
+    SUN,
+    CLOUD,
+    GREATSADNESS,
+    ACTORSNAME,
+    DISTRACTED,
+    ITCH,
+    WRITEDOWN,
+    JHANA,
+    PROGRESS,
+    BLISS,
+    WATERPLANTS,
+    OVERWHELMING,
+    NUM_OF_GAME_MSGS
+};
 
+sprite_sheet game_msgs[NUM_OF_GAME_MSGS];
+
+int gameMsgPos = WINDOW_WIDTH;
+int gameMsgPosInc = 5;
+int gameMsgAlpha = 255;
+int game_msg = stb_rand() % NUM_OF_GAME_MSGS;
+int prevMsg = game_msg;
+
+gs game_state = PERSON_FRONT;
+titlem title_message = HOLD_SPACE;
+
+SDL_Surface* tempSurface = NULL;
+
+sprite_sheet background;
+sprite_sheet personFront;
+sprite_sheet personSittingA;
+sprite_sheet personSittingB;
+sprite_sheet titleScreen;
+sprite_sheet title;
+sprite_sheet titleesctoquit;
+sprite_sheet titlestriving;
+sprite_sheet titledistraction;
+sprite_sheet titletoomuchspace;
+sprite_sheet titletoolittlespace;
+sprite_sheet personTurning;
+sprite_sheet personWalking;
+
+bool gameRunning = true;
+
+Uint8 gameAlpha = 255;
+int alphaInc = 8;
+
+bool spaceIsDown;
+
+SDL_Event e;
+
+int init(void) {
     if(SDL_Init(SDL_INIT_VIDEO) < 0)
         return 1;
-    else
-    {
-        window = SDL_CreateWindow("Meditation by Mark Milan", 
-                                  SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-                                  WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_SHOWN);
-        if(window == NULL)
-            return 1;
-        else 
-        {
-            SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN);
-            renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
-            if(renderer == NULL)
-                return 1;
-            else 
-            {
-                SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
-                if(!(IMG_Init(IMG_INIT_PNG) & IMG_INIT_PNG))
-                    return 1;
-            }
-        }
-    }
 
-    SDL_Surface* tempSurface = NULL;
+    window = SDL_CreateWindow("Meditation by Mark Milan",
+                              SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+                              WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_SHOWN);
+    if(window == NULL)
+        return 1;
 
-    sprite_sheet background = loadSpriteSheet("../data/xbackground.png", 4, 1280, 50);
-    sprite_sheet personFront = loadSpriteSheet("../data/xpersonfront.png", 12, 419, 377);
-    sprite_sheet personSittingA = loadSpriteSheet("../data/xpersonsittinga.png", 21, 419, 377);
-    sprite_sheet personSittingB = loadSpriteSheet("../data/xpersonsittingb.png", 21, 419, 377);
-    sprite_sheet titleScreen = loadSpriteSheet("../data/xtitlescreen.png", 5, 419, 377);
-    sprite_sheet title = loadSpriteSheet("../data/xtitle.png", 5, 419, 171);
-    sprite_sheet titleesctoquit = loadSpriteSheet("../data/xtitleesctoquit.png", 5, 419, 98);
-    sprite_sheet titlestriving = loadSpriteSheet("../data/xtitlestriving.png", 5, 419, 171);
-    sprite_sheet titledistraction = loadSpriteSheet("../data/xtitledistraction.png", 5, 419, 171);
-    sprite_sheet titletoomuchspace = loadSpriteSheet("../data/xtitletoomuchspace.png", 5, 419, 98);
-    sprite_sheet titletoolittlespace = loadSpriteSheet("../data/xtitletoolittlespace.png", 5, 419, 98);
-    sprite_sheet personTurning = loadSpriteSheet("../data/xpersonturning.png", 19, 419, 377);
-    sprite_sheet personWalking = loadSpriteSheet("../data/xpersonwalking.png", 21, 419, 377);
+    //SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN);
+    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 
-    enum gm 
-    {
-        ICANTMEDITATE,
-        IMUSTSTOP,
-        ALMONDMILK,
-        IMSOSPIRITUAL,
-        IMBORED,
-        MYSTICALEXPERIENCE,
-        UNPLEASANTMEMORY,
-        SEXUALIMAGERY,
-        THISISWEIRD,
-        LAUGHTERTHOUGHT,
-        LEFTFOOT,
-        SUN,
-        CLOUD,
-        GREATSADNESS,
-        ACTORSNAME,
-        DISTRACTED,
-        ITCH,
-        WRITEDOWN,
-        JHANA,
-        PROGRESS,
-        BLISS,
-        WATERPLANTS,
-        OVERWHELMING,
-        NUM_OF_GAME_MSGS
-    };
+    if(renderer == NULL)
+        return 1;
 
-    sprite_sheet game_msgs[NUM_OF_GAME_MSGS];
+    SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
+
+    if(!(IMG_Init(IMG_INIT_PNG) & IMG_INIT_PNG))
+        return 1;
+
+    background = loadSpriteSheet("../data/xbackground.png", 4, 1280, 50);
+    personFront = loadSpriteSheet("../data/xpersonfront.png", 12, 419, 377);
+    personSittingA = loadSpriteSheet("../data/xpersonsittinga.png", 21, 419, 377);
+    personSittingB = loadSpriteSheet("../data/xpersonsittingb.png", 21, 419, 377);
+    titleScreen = loadSpriteSheet("../data/xtitlescreen.png", 5, 419, 377);
+    title = loadSpriteSheet("../data/xtitle.png", 5, 419, 171);
+    titleesctoquit = loadSpriteSheet("../data/xtitleesctoquit.png", 5, 419, 98);
+    titlestriving = loadSpriteSheet("../data/xtitlestriving.png", 5, 419, 171);
+    titledistraction = loadSpriteSheet("../data/xtitledistraction.png", 5, 419, 171);
+    titletoomuchspace = loadSpriteSheet("../data/xtitletoomuchspace.png", 5, 419, 98);
+    titletoolittlespace = loadSpriteSheet("../data/xtitletoolittlespace.png", 5, 419, 98);
+    personTurning = loadSpriteSheet("../data/xpersonturning.png", 19, 419, 377);
+    personWalking = loadSpriteSheet("../data/xpersonwalking.png", 21, 419, 377);
 
     game_msgs[ICANTMEDITATE] = loadSpriteSheet("../data/xicantmeditate.png", 5, 300, 146);
     game_msgs[IMUSTSTOP] = loadSpriteSheet("../data/ximuststop.png", 4, 358, 260);
@@ -172,213 +208,223 @@ int main(int argc, char* argv[])
     game_msgs[WATERPLANTS] = loadSpriteSheet("../data/xwaterplants.png", 4, 274, 177);
     game_msgs[OVERWHELMING] = loadSpriteSheet("../data/xoverwhelming.png", 4, 314, 147);
 
-    int gameMsgPos = WINDOW_WIDTH;
-    int gameMsgPosInc = 5;
-    int gameMsgAlpha = 255;
-    int game_msg = stb_rand() % NUM_OF_GAME_MSGS; 
-    int prevMsg = game_msg;
+    return 0;
+}
 
-    gs game_state = PERSON_FRONT;
-    titlem title_message = HOLD_SPACE;
+static void mainloop(void)
+{
+    if(!gameRunning) {
+        #ifdef __EMSCRIPTEN__
+        emscripten_cancel_main_loop();
+        #else
+        exit(0);
+        #endif
+    }
 
-    bool gameRunning = true;
-
-    Uint8 gameAlpha = 255;
-    int alphaInc = 8;
-
-    bool spaceIsDown;
-
-    SDL_Event e;
-    while(gameRunning) 
+    while(SDL_PollEvent(&e) != 0)
     {
-        while(SDL_PollEvent(&e) != 0) 
-        {
-            if(e.type == SDL_QUIT) 
-            {
-                SDL_SetWindowFullscreen(window, 0);
-                gameRunning = false;
-            }
-        }
-
-        const Uint8* keyboardState = SDL_GetKeyboardState(NULL);
-        if(keyboardState[SDL_SCANCODE_SPACE])
-            spaceIsDown = true;
-        else
-            spaceIsDown = false;
-
-        if(keyboardState[SDL_SCANCODE_ESCAPE] || keyboardState[SDL_SCANCODE_Q])
+        if(e.type == SDL_QUIT)
         {
             SDL_SetWindowFullscreen(window, 0);
             gameRunning = false;
         }
-
-        SDL_RenderClear(renderer);
-
-        drawSpriteClip(&background, 0, 450);
-
-        if(game_state == PERSON_FRONT)
-        {
-            drawSpriteClip(&personFront, 431, 171);
-            if(personFront.currentFrame == 0)
-                game_state = PERSON_SITTING_A;
-        }
-
-        if(game_state == PERSON_SITTING_A)
-        {
-            drawSpriteClip(&personSittingA, 431, 171);
-            if(personSittingA.currentFrame == 0)
-                game_state = PERSON_SITTING_B;
-        }
-
-        if(game_state == PERSON_SITTING_B)
-        {
-            drawSpriteClip(&personSittingB, 431, 171);
-            if(personSittingB.currentFrame == 0)
-                game_state = TITLE_SCREEN;
-        }
-
-        if(game_state == TITLE_SCREEN)
-        {
-            drawSpriteClip(&titleScreen, 431, 171, gameAlpha);
-
-            if(title_message == HOLD_SPACE)
-            {
-                drawSpriteClip(&title, 431, 171, gameAlpha);
-                drawSpriteClip(&titleesctoquit, 431, 550, gameAlpha);
-            }
-            else if(title_message == TOO_MUCH_SPACE)
-            {
-                drawSpriteClip(&titlestriving, 431, 171, gameAlpha);
-                drawSpriteClip(&titletoomuchspace, 431, 550, gameAlpha);
-            }
-            else if(title_message == TOO_LITTLE_SPACE)
-            {
-                drawSpriteClip(&titledistraction, 431, 171, gameAlpha);
-                drawSpriteClip(&titletoolittlespace, 431, 550, gameAlpha);
-            }
-
-            if(spaceIsDown && gameAlpha <= alphaInc)
-            {
-                gameAlpha = 20;
-                game_state = GAME_FRONT;
-            }
-            else if(spaceIsDown && gameAlpha >= alphaInc)
-                gameAlpha -= alphaInc;
-            else if(!spaceIsDown && gameAlpha <= (255 - alphaInc))
-                gameAlpha += alphaInc; 
-        }
-
-        if(game_state == GAME_FRONT)
-        {
-            if(gameAlpha <= alphaInc)
-            {
-                game_state = TITLE_SCREEN;
-                gameAlpha = 255;
-            }
-            else if(!spaceIsDown && gameAlpha >= alphaInc)
-            {
-                gameAlpha -= alphaInc;
-            }
-            else if(spaceIsDown && gameAlpha <= (255 - alphaInc))
-                gameAlpha += alphaInc; 
-            else if(spaceIsDown && gameAlpha >= (255 - alphaInc))
-                game_state = TITLE_SCREEN;
-
-            drawSpriteClip(&personFront, 431, 171, gameAlpha);
-
-            if(personFront.currentFrame == 0) 
-            {
-                game_state= GAME_TURNING;
-                personTurning.currentFrame = 0;
-            }
-        }
-
-        if(game_state == GAME_TURNING)
-        {
-            if(gameAlpha <= alphaInc)
-            {
-                title_message = TOO_LITTLE_SPACE;
-                game_state = TITLE_SCREEN;
-                gameAlpha = 255;
-            }
-            else if(!spaceIsDown && gameAlpha >= alphaInc)
-            {
-                gameAlpha -= alphaInc;
-            }
-            else if(spaceIsDown && gameAlpha <= (255 - alphaInc))
-                gameAlpha += alphaInc; 
-            else if(spaceIsDown && gameAlpha >= (255 - alphaInc))
-            {
-                title_message = TOO_MUCH_SPACE;
-                game_state = TITLE_SCREEN;
-            }
-
-            drawSpriteClip(&personTurning, 431, 171, gameAlpha);
-
-            if(personTurning.currentFrame == 0)
-            {
-                game_state = GAME_WALKING;
-                personWalking.currentFrame = 0;
-            }
-        }
-
-        if(game_state == GAME_WALKING)
-        {
-            if(gameMsgAlpha > 0)
-            {
-                drawSpriteClip(&game_msgs[game_msg], gameMsgPos, 30, gameMsgAlpha);
-                gameMsgAlpha -= 1;
-                gameMsgPos -= gameMsgPosInc;
-            }
-            else
-            {
-                gameMsgPos = WINDOW_WIDTH;
-                gameMsgAlpha = 255;
-
-                prevMsg = game_msg;
-                do { game_msg = stb_rand() % NUM_OF_GAME_MSGS; 
-                } while(game_msg == prevMsg);
-            }
-
-            drawSpriteClip(&personWalking, 431, 171, gameAlpha);
-
-            if(gameAlpha <= alphaInc)
-            {
-                game_state = TITLE_SCREEN;
-                title_message = TOO_LITTLE_SPACE;
-
-                prevMsg = game_msg;
-                do { game_msg = stb_rand() % NUM_OF_GAME_MSGS; 
-                } while(game_msg == prevMsg);
-
-                gameMsgPos = WINDOW_WIDTH;
-                gameMsgAlpha = 255;
-                gameAlpha = 255;
-            }
-            else if(!spaceIsDown && gameAlpha >= alphaInc)
-            {
-                gameAlpha -= alphaInc;
-            }
-            else if(spaceIsDown && gameAlpha <= (255 - alphaInc))
-                gameAlpha += alphaInc; 
-            else if(spaceIsDown && gameAlpha >= (255 - alphaInc))
-            {
-                game_state = TITLE_SCREEN;
-                title_message = TOO_MUCH_SPACE;
-
-                prevMsg = game_msg;
-                do { game_msg = stb_rand() % NUM_OF_GAME_MSGS; 
-                } while(game_msg == prevMsg);
-                gameMsgPos = WINDOW_WIDTH;
-                gameMsgAlpha = 255;
-            }
-
-        }
-
-        SDL_RenderPresent(renderer);
-        //TODO(mark): Make constant i.e. delay = some time - time for tick 
-        SDL_Delay(100);
     }
+
+    const Uint8* keyboardState = SDL_GetKeyboardState(NULL);
+    if(keyboardState[SDL_SCANCODE_SPACE])
+        spaceIsDown = true;
+    else
+        spaceIsDown = false;
+
+    if(keyboardState[SDL_SCANCODE_ESCAPE] || keyboardState[SDL_SCANCODE_Q])
+    {
+        SDL_SetWindowFullscreen(window, 0);
+        gameRunning = false;
+    }
+
+    SDL_RenderClear(renderer);
+
+    drawSpriteClip(&background, 0, 450);
+
+    if(game_state == PERSON_FRONT)
+    {
+        drawSpriteClip(&personFront, 431, 171);
+        if(personFront.currentFrame == 0)
+            game_state = PERSON_SITTING_A;
+    }
+
+    if(game_state == PERSON_SITTING_A)
+    {
+        drawSpriteClip(&personSittingA, 431, 171);
+        if(personSittingA.currentFrame == 0)
+            game_state = PERSON_SITTING_B;
+    }
+
+    if(game_state == PERSON_SITTING_B)
+    {
+        drawSpriteClip(&personSittingB, 431, 171);
+        if(personSittingB.currentFrame == 0)
+            game_state = TITLE_SCREEN;
+    }
+
+    if(game_state == TITLE_SCREEN)
+    {
+        drawSpriteClip(&titleScreen, 431, 171, gameAlpha);
+
+        if(title_message == HOLD_SPACE)
+        {
+            drawSpriteClip(&title, 431, 171, gameAlpha);
+            drawSpriteClip(&titleesctoquit, 431, 550, gameAlpha);
+        }
+        else if(title_message == TOO_MUCH_SPACE)
+        {
+            drawSpriteClip(&titlestriving, 431, 171, gameAlpha);
+            drawSpriteClip(&titletoomuchspace, 431, 550, gameAlpha);
+        }
+        else if(title_message == TOO_LITTLE_SPACE)
+        {
+            drawSpriteClip(&titledistraction, 431, 171, gameAlpha);
+            drawSpriteClip(&titletoolittlespace, 431, 550, gameAlpha);
+        }
+
+        if(spaceIsDown && gameAlpha <= alphaInc)
+        {
+            gameAlpha = 20;
+            game_state = GAME_FRONT;
+        }
+        else if(spaceIsDown && gameAlpha >= alphaInc)
+            gameAlpha -= alphaInc;
+        else if(!spaceIsDown && gameAlpha <= (255 - alphaInc))
+            gameAlpha += alphaInc;
+    }
+
+    if(game_state == GAME_FRONT)
+    {
+        if(gameAlpha <= alphaInc)
+        {
+            game_state = TITLE_SCREEN;
+            gameAlpha = 255;
+        }
+        else if(!spaceIsDown && gameAlpha >= alphaInc)
+        {
+            gameAlpha -= alphaInc;
+        }
+        else if(spaceIsDown && gameAlpha <= (255 - alphaInc))
+            gameAlpha += alphaInc;
+        else if(spaceIsDown && gameAlpha >= (255 - alphaInc))
+            game_state = TITLE_SCREEN;
+
+        drawSpriteClip(&personFront, 431, 171, gameAlpha);
+
+        if(personFront.currentFrame == 0)
+        {
+            game_state= GAME_TURNING;
+            personTurning.currentFrame = 0;
+        }
+    }
+
+    if(game_state == GAME_TURNING)
+    {
+        if(gameAlpha <= alphaInc)
+        {
+            title_message = TOO_LITTLE_SPACE;
+            game_state = TITLE_SCREEN;
+            gameAlpha = 255;
+        }
+        else if(!spaceIsDown && gameAlpha >= alphaInc)
+        {
+            gameAlpha -= alphaInc;
+        }
+        else if(spaceIsDown && gameAlpha <= (255 - alphaInc))
+            gameAlpha += alphaInc;
+        else if(spaceIsDown && gameAlpha >= (255 - alphaInc))
+        {
+            title_message = TOO_MUCH_SPACE;
+            game_state = TITLE_SCREEN;
+        }
+
+        drawSpriteClip(&personTurning, 431, 171, gameAlpha);
+
+        if(personTurning.currentFrame == 0)
+        {
+            game_state = GAME_WALKING;
+            personWalking.currentFrame = 0;
+        }
+    }
+
+    if(game_state == GAME_WALKING)
+    {
+        if(gameMsgAlpha > 0)
+        {
+            drawSpriteClip(&game_msgs[game_msg], gameMsgPos, 30, gameMsgAlpha);
+            gameMsgAlpha -= 1;
+            gameMsgPos -= gameMsgPosInc;
+        }
+        else
+        {
+            gameMsgPos = WINDOW_WIDTH;
+            gameMsgAlpha = 255;
+
+            prevMsg = game_msg;
+            do { game_msg = stb_rand() % NUM_OF_GAME_MSGS;
+            } while(game_msg == prevMsg);
+        }
+
+        drawSpriteClip(&personWalking, 431, 171, gameAlpha);
+
+        if(gameAlpha <= alphaInc)
+        {
+            game_state = TITLE_SCREEN;
+            title_message = TOO_LITTLE_SPACE;
+
+            prevMsg = game_msg;
+            do { game_msg = stb_rand() % NUM_OF_GAME_MSGS;
+            } while(game_msg == prevMsg);
+
+            gameMsgPos = WINDOW_WIDTH;
+            gameMsgAlpha = 255;
+            gameAlpha = 255;
+        }
+        else if(!spaceIsDown && gameAlpha >= alphaInc)
+        {
+            gameAlpha -= alphaInc;
+        }
+        else if(spaceIsDown && gameAlpha <= (255 - alphaInc))
+            gameAlpha += alphaInc;
+        else if(spaceIsDown && gameAlpha >= (255 - alphaInc))
+        {
+            game_state = TITLE_SCREEN;
+            title_message = TOO_MUCH_SPACE;
+
+            prevMsg = game_msg;
+            do { game_msg = stb_rand() % NUM_OF_GAME_MSGS;
+            } while(game_msg == prevMsg);
+            gameMsgPos = WINDOW_WIDTH;
+            gameMsgAlpha = 255;
+        }
+
+    }
+
+    SDL_RenderPresent(renderer);
+
+    //TODO(mark): Make constant i.e. delay = some time - time for tick
+    SDL_Delay(100);
+}
+
+int main(int argc, char* argv[])
+{
+    if(init()) {
+        return 1;
+    }
+
+    #ifdef __EMSCRIPTEN__
+    emscripten_set_main_loop(mainloop, 0, 1);
+    #else
+    while(1)
+    {
+        mainloop();
+    }
+    #endif
 
     return 0;
 }
