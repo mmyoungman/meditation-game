@@ -145,6 +145,7 @@ bool gameRunning = true;
 Uint8 gameAlpha = 255;
 int alphaInc = 8;
 
+bool fingerDown;
 bool spaceIsDown;
 
 SDL_Event e;
@@ -221,27 +222,33 @@ static void mainloop(void)
         #endif
     }
 
-    while(SDL_PollEvent(&e) != 0)
+    // handle input
     {
-        if(e.type == SDL_QUIT)
+        while(SDL_PollEvent(&e) != 0) {
+            if(e.type == SDL_QUIT) {
+                SDL_SetWindowFullscreen(window, 0);
+                gameRunning = false;
+            }
+
+            if (e.type == SDL_FINGERDOWN) fingerDown = true;
+            if (e.type == SDL_FINGERUP) fingerDown = false;
+        }
+
+        const Uint8* keyboardState = SDL_GetKeyboardState(NULL);
+
+        // determine if space is pressed or screen touched on mobile
+        spaceIsDown = keyboardState[SDL_SCANCODE_SPACE];
+        if(!spaceIsDown)
+            spaceIsDown = fingerDown;
+
+        if(keyboardState[SDL_SCANCODE_ESCAPE] || keyboardState[SDL_SCANCODE_Q])
         {
             SDL_SetWindowFullscreen(window, 0);
             gameRunning = false;
         }
     }
 
-    const Uint8* keyboardState = SDL_GetKeyboardState(NULL);
-    if(keyboardState[SDL_SCANCODE_SPACE])
-        spaceIsDown = true;
-    else
-        spaceIsDown = false;
-
-    if(keyboardState[SDL_SCANCODE_ESCAPE] || keyboardState[SDL_SCANCODE_Q])
-    {
-        SDL_SetWindowFullscreen(window, 0);
-        gameRunning = false;
-    }
-
+    //render
     SDL_RenderClear(renderer);
 
     drawSpriteClip(&background, 0, 450);

@@ -7,18 +7,18 @@ To build/run you need:
 - SDL2
 - SDL2-image
 
+### For linux
 ```
 $ mkdir build
 $ cd build
-$ ../code/build.sh
-$ ./meditation_game
+$ ../code/build_linux.sh
 ```
 
-### To build with emscripten
+### For wasm
+Additionally need emscripten installed for `emcc` and `emrun`.
 
 ```
-mkdir build
-cd build
-emcc ../code/meditation_game.cpp -o index.html -s USE_SDL=2 -s USE_SDL_IMAGE=2 -s SDL2_IMAGE_FORMATS=['PNG'] -s USE_LIBPNG=1 -s ALLOW_MEMORY_GROWTH=1 -D__EMSCRIPTEN__ --preload-file ../data
-emrun --port 8080 .
+$ mkdir build
+$ cd build
+$ ../code/build_wasm.sh
 ```
